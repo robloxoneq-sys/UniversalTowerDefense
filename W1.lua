@@ -1,6 +1,13 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local GuiService = game:GetService("GuiService")
 
+local localPlayer = Players.LocalPlayer
+local playerGui = localPlayer:WaitForChild("PlayerGui")
+
+-- รีโมทต่างๆ
 local KnitServices = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")["sleitnick_knit@1.7.0"].knit.Services
 local VoteRemote = KnitServices.WaveService.RF.Vote
 local PlaceUnitRemote = KnitServices.TowerService.RF.PlaceUnit
@@ -8,34 +15,48 @@ local UpgradeUnitRemote = KnitServices.TowerService.RF.UpgradeUnit
 local UseAbilityRemote = KnitServices.TowerService.RE.UseAbility
 
 local UnitsFolder = Workspace:WaitForChild("Ignore"):WaitForChild("Units")
+local gameUI = playerGui:WaitForChild("GameUI")
+local timeFrame = gameUI.HUD.Upper.WaveInformations.Container:WaitForChild("Time")
 
+-- ฟังก์ชันสำหรับแปลงเวลา "นาที:วินาที" เป็น วินาทีทั้งหมด (เช่น "00:14" -> 14 วินาที)
+local function timeToSeconds(timeStr)
+    local minutes, seconds = timeStr:match("(%d+):(%d+)")
+    if minutes and seconds then
+        return (tonumber(minutes) * 60) + tonumber(seconds)
+    end
+    return 0
+end
+
+-- ฟังก์ชันค้นหา TextLabel ข้างใน Time Frame
+local function getTimeLabel()
+    for _, child in ipairs(timeFrame:GetChildren()) do
+        if child:IsA("TextLabel") or child:IsA("TextBox") then
+            return child
+        end
+    end
+    return nil
+end
+
+-- เริ่มทำงานสคริปต์
 VoteRemote:InvokeServer(true)
 task.wait(0.5)
 
-local function checkPosition(unit, targetPos)
-    if not unit or not unit:IsA("Position") and not unit:IsA("Model") then return false end
-    local currentPos = unit:GetPivot().Position
-    return (currentPos - targetPos).Magnitude < 0.5
-end
-
-local targetPos1 = Vector3.new(5428.521, 4.4000001, -3043.79248)
-local targetPos2 = Vector3.new(5428.521, 4.4000001, -3046.5022)
-local targetPos3 = Vector3.new(5428.521, 4.4000001, -3049.25537)
-
-print("กำลังรอให้ Unit 1, 2, 3 อยู่ในตำแหน่งที่กำหนด...")
+print("กำลังค้นหา TextLabel ของเวลา...")
+local timeLabel = nil
 repeat
-    local u1 = UnitsFolder:FindFirstChild("1")
-    local u2 = UnitsFolder:FindFirstChild("2")
-    local u3 = UnitsFolder:FindFirstChild("3")
-    
-    local c1 = u1 and (u1:GetPivot().Position - targetPos1).Magnitude < 0.1
-    local c2 = u2 and (u2:GetPivot().Position - targetPos2).Magnitude < 0.1
-    local c3 = u3 and (u3:GetPivot().Position - targetPos3).Magnitude < 0.1
-    
-    task.wait(0.1)
-until c1 and c2 and c3
+    timeLabel = getTimeLabel()
+    if not timeLabel then task.wait(0.5) end
+until timeLabel
+print("เจอ TextLabel เวลาแล้ว!")
 
-print("ตำแหน่งตรงแล้ว! กำลังวางยูนิต...")
+-- ลูปเช็คเวลาจนกว่าจะถึง 00:14 ขึ้นไป (14 วินาทีขึ้นไป)
+print("กำลังรอให้เวลาเป็น 00:14 ขึ้นไป...")
+repeat
+    local currentSeconds = timeToSeconds(timeLabel.Text)
+    task.wait(0.1)
+until currentSeconds >= 14  -- 14 วินาที มีค่าเท่ากับเวลา "00:14"
+
+print("เวลาถึงกำหนดแล้ว! (`" .. timeLabel.Text .. "`) กำลังวางยูนิต...")
 PlaceUnitRemote:InvokeServer(
     1,
     CFrame.new(5425.6098632812, 2.75, -3036.8666992188, 1, 0, 0, 0, 1, 0, 0, 0, 1)
@@ -78,14 +99,10 @@ for _, v in pairs(UnitsFolder:GetChildren()) do
     end)
 end
 
-print("สคริปต์ทำงานเสร็จสิ้นทั้งหมดเรียบร้อย!")
+print("สคริปต์หลักทำงานเสร็จสิ้น! เริ่มทำงานระบบ Auto-Lobby...")
 
-local Players = game:GetService("Players")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local GuiService = game:GetService("GuiService")
-
-local plr = Players.LocalPlayer
-local resultFrame = plr.PlayerGui.GameUI.MissionResultFrame
+-- ระบบคลิกหน้าจอ / กลับล็อบบี้อัตโนมัติ
+local resultFrame = gameUI.MissionResultFrame
 
 while task.wait() do
     if resultFrame.Enabled then
